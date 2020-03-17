@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<script src="https://unpkg.com/d3@4"></script>
+<script src="https://unpkg.com/topojson-client@3"></script>
+</head>
+<body>
+<h1>COVID-19 Tracker</h1>
+<p id="selectedData">No country selected</p>
+<svg id="map"></svg>
+<script>
+var currProperty = "active"
+
+displays = {
+    "confirmed": {
+        "color": "rgba(255, 215, 0",
+        "label": "Confirmed Cases",
+        "calculation": function(d) { return d.confirmed; }
+    },
+    "active": {
+        "color": "rgba(255, 215, 0",
+        "label": "Active Cases",
+        "calculation": function(d) { return d.confirmed - d.recovered; }
+    },
+    "dead": {
+        "color": "rgba(255, 0, 0",
+        "label": "Deaths",
+        "calculation": function(d) { return d.dead; }
+    },
+    "recovered": {
+        "color": "rgba(0, 255, 0",
+        "label": "Recovered",
+        "calculation": function(d) { return d.recovered; }
+    }
+}
+
+var color = d3.scaleLog().domain([1, 1000000]).range([0.1, 1]);
+
+var width = 1250;
+var height = 650;
+var svg = d3.select("#map").attr("width", width).attr("height", height);
+var projection = d3.geoMercator()
+                   .scale(200)
+                   .translate([590, 400])
+var path = d3.geoPath().projection(projection);
+d3.queue()
+.defer(d3.json, "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
+.defer(d3.json, "http://localhost:8000/covid.json")
+.await(function(error, world, covid) {
+    if (error) throw error;
+
+    features = topojson.feature(world, world.objects.countries).features
+    features.forEach(function(d) {
+        d.covid = covid[Number.parseInt(d['id'])];
+    })
+
+    svg.selectAll("path")
+     .data(features)
+     .enter().append("path")
+     .attr("d", path)
+     .style("fill", function(d) {
+        if (d.covid === undefined)
+            return "rgba(200, 200, 200, 1.0)";
+        let value = displays[currProperty].calculation(d.covid);
+        if (value === 0)
+            return "rgba(200, 200, 200, 1.0)";
+        else
+            return displays[currProperty].color + ", " + color(value) + ")";
+     })
+     .on("mouseover", function(d) {
+        let value = displays[currProperty].calculation(d.covid);
+        let label = displays[currProperty].label;
+        let country = d.properties.name;
+        document.getElementById("selectedData").innerHTML = `${country}: ${value} ${label}`
+     })
+});
+</script>
+</body>
